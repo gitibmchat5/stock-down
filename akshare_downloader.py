@@ -45,9 +45,9 @@ def parse_args() -> argparse.Namespace:
 
 def init_db(db_path: str):
     engine = create_engine(f"sqlite:///{db_path}", pool_size=5, max_overflow=10)
-    # create index tables if not exists
+    # create tables if they do not exist and add indexes
     with engine.begin() as conn:
-        conn.execute(
+        conn.exec_driver_sql(
             """
             CREATE TABLE IF NOT EXISTS daily (
                 ts_code TEXT,
@@ -58,7 +58,10 @@ def init_db(db_path: str):
             )
             """
         )
-        conn.execute(
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_daily_date ON daily(trade_date)"
+        )
+        conn.exec_driver_sql(
             """
             CREATE TABLE IF NOT EXISTS weekly (
                 ts_code TEXT,
@@ -69,7 +72,10 @@ def init_db(db_path: str):
             )
             """
         )
-        conn.execute(
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_weekly_date ON weekly(trade_date)"
+        )
+        conn.exec_driver_sql(
             """
             CREATE TABLE IF NOT EXISTS minute (
                 ts_code TEXT,
@@ -79,6 +85,9 @@ def init_db(db_path: str):
                 PRIMARY KEY (ts_code, datetime)
             )
             """
+        )
+        conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_minute_datetime ON minute(datetime)"
         )
     return engine
 
@@ -110,7 +119,7 @@ def append_data(engine, table: str, df: pd.DataFrame, ts_code: str, date_col: st
     if df.empty:
         return
     df.insert(0, "ts_code", ts_code)
-    df.to_sql(table, engine, if_exists="append", index=False, method="multi")
+    df.to_sql(table, engine, if_exists="append", index=False)
 
 
 def download_stock(engine, code: str, start: str, end: str, sleep_time: float):
